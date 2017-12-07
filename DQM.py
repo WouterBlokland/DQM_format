@@ -69,12 +69,12 @@ def removePartialEvent(lines):
 def getInt(s):
     return int(re.search(r'\d+', s).group())
 
+
 def getFloat(s):
     return float(re.search(r'\d+\.\d+', s).group())
 
 
 ################################################################################
-
 
 
 def run(runid):
@@ -85,12 +85,11 @@ def run(runid):
 
     for hvPoint in os.listdir(dir):
 
-
         HVdir = dir + hvPoint + '/'
         print "Running in dir %s" % HVdir
 
-        tFull = ROOT.TTree("data", "data") # full events
-        tStrip = ROOT.TTree("data", "data") # stripped events
+        tFull = ROOT.TTree("data", "data")  # full events
+        tStrip = ROOT.TTree("data", "data")  # stripped events
 
         evNum = numpy.zeros(1, dtype=int)
         trgTime = numpy.zeros(1, dtype=int)
@@ -106,7 +105,6 @@ def run(runid):
             pulse = ROOT.vector('double')()
             pulses.append(pulse)
 
-
             tFull.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
             tStrip.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
 
@@ -115,7 +113,7 @@ def run(runid):
 
         print "LOOOOP", nEvents
 
-        ff = math.ceil(nEvents / (nEvents*0.05))
+        ff = math.ceil(nEvents / (nEvents * 0.05))
         entriesWritten = 0
 
         for i in range(0, len(files[0])):
@@ -158,14 +156,11 @@ def run(runid):
         time.Write("time")
         f2.Close()
 
-        files = None # clear memory
-
-
+        files = None  # clear memory
 
 
 # PROBLEMATIC:
 # BINARY: 2381, 2380
-
 
 configFile = "config_dqm"  # Default config file if none is given on cli
 # --- Load configuration File
@@ -181,7 +176,7 @@ if len(sys.argv) > 2:
     if isinstance(sys.argv[2], list):
         runList = sys.argv[2]
     else:
-        for iRun in range(2,len(sys.argv)):
+        for iRun in range(2, len(sys.argv)):
             runList.append(sys.argv[iRun])
 else:
     runList = conf.runList
@@ -190,7 +185,6 @@ for runid in runList:
     print 'runid: ', runid
     run(runid)
 
-
 # runs = [2375, 2379, 2383, 2385, 2388, 2390, 2392, 2394, 2396, 2398, 2400, 2402, 2404]  # first -> OK
 # runs = [2406, 2408, 2410, 2412, 2414, 2416, 2418, 2420, 2422, 2424, 2426, 2428, 2430, 2432]  # second -> OK
 # runs = [2377, 2382, 2384, 2386, 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third -> OK
@@ -198,10 +192,7 @@ for runid in runList:
 
 # runs = [2381]
 
-
-
 # runs = [ 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third
-
 
 # runs = [2398, 2402, 2399, 2419, 2396, 2395, 2424, 2401, 2397, 2393, 2392, 2390]
 # runs = [2409, 2403, 2412, 2420, 2413, 2416, 2423]
