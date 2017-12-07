@@ -11,14 +11,15 @@ import glob
 import sys, os
 from subprocess import call
 
+# Import default config file
+# Not needed here just for dumb editor not to complain about config not existing
+import config_dqm as conf
+
 # define fixed time vector of conf.recordLength ns
 time = ROOT.TVectorD(conf.recordLength)
 for i in range(0, conf.recordLength):
     time[i] = i
 
-# Import default config file
-# Not needed here just for dumb editor not to complain about config not existing
-import config_dqm as conf
 
 def loadFiles(dir):
     '''Returns nCompleteEvent (int), fileList (list[lines])
