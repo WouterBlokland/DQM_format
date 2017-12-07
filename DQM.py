@@ -175,7 +175,15 @@ except (ImportError, SyntaxError):
     sys.exit("[{0}] - Cannot import config file '{1}'".format(scriptName, configFile))
 # --- /Load configuration File
 
-runList = conf.runList
+runList = []
+if len(sys.argv) > 2:
+    if isinstance(sys.argv[2], list):
+        runList = sys.argv[2]
+    else:
+        for iRun in range(2,len(sys.argv)):
+            runList.append(sys.argv[iRun])
+else:
+    runList = conf.runList
 
 for runid in runList:
     print 'runid: ', runid
