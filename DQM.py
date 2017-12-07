@@ -1,4 +1,7 @@
-import ROOT 
+# Ensure that a division will return a float
+from __future__ import division
+
+import ROOT
 import itertools as it
 import re
 import numpy
@@ -21,16 +24,34 @@ def loadFiles(dir):
     nEvents = 0
     files = []
     for i in range(0, conf.nChannels):
-
-
-        lines = [line.rstrip('\n') for line in open("%s/wave_%d.txt" % (dir, i))]
+        file = dir + conf.dataFileFormat % i
+        lines = [line.rstrip('\n') for line in open(file,'r')]
+        nEventsInFile = getCompleteEvents(lines)
+        if i > 0:
+            assert nEventsInFile == nEvents, sys.exit(
+                '[ERROR]: Channels {} and {} don\'t have same number of event!: {}, {} respectively.'.format(
+                    i, i - 1, nEvents, nEventsInFile))
+        nEvents = nEventsInFile
         files.append(lines)
-        nEvents = len(lines)
+    return int(nEvents), files
+
+
+def getCompleteEvents(lines):
     nEvents = len(lines) / (conf.recordLength + conf.headerSize)
+    if nEvents.is_integer() is False:
+        lines = removePartialEvent(lines)
+        nEvents = len(lines) / (conf.recordLength + conf.headerSize)
+        assert nEvents.is_integer() is True, sys.exit('[ERROR]: What the flying duck?')
+    return int(nEvents)
 
-    return nEvents, files
-    
 
+def removePartialEvent(lines):
+    nLinesPartialEvt = len(lines) % (conf.recordLength + conf.headerSize)
+    print '[WARNING]: Last event was not recorded properly, only {} line recorded - Removing event...'.format(
+        nLinesPartialEvt)
+    del lines[-nLinesPartialEvt:]
+    assert len(lines) % (conf.recordLength + conf.headerSize) == 0, sys.exit('[ERROR]: You still have partial event')
+    return lines
 
 
 def getInt(s):
@@ -48,6 +69,7 @@ def run(runid):
 
     dir = conf.dataDir % runid
     print "Analyze run %s" % runid
+    assert os.path.exists(dir) is True, sys.exit('[ERROR]: Directory `{}` not found...exiting'.format(dir))
 
     for hvPoint in os.listdir(dir):
 
@@ -85,9 +107,6 @@ def run(runid):
         entriesWritten = 0
 
         for i in range(0, len(files[0])):
-
-            
-
             if "Record Length" in files[0][i]: continue
             elif "BoardID" in files[0][i]: continue
             elif "Channel" in files[0][i]: continue
@@ -97,8 +116,6 @@ def run(runid):
             elif "DC offset (DAC)" in files[0][i]: continue
             elif "Start Index Cell" in files[0][i]: continue
             else:
-
-
                 for j in range(0, conf.nChannels):
                     pulses[j].push_back(float(files[j][i]) * 1000 / 4096)
 
@@ -109,20 +126,14 @@ def run(runid):
                 #if 1283 == entriesWritten: break
 
                 tFull.Fill()
-                
-
                 if entriesWritten%ff== 0: 
 
                     print "Fill stripped ", i, tFull.GetEntries()
                     tStrip.Fill()
 
                 #print "WRITE", evNum, trgTime
-
-
                 for k in range(0, conf.nChannels):
                     pulses[k].clear()
-
-
 
         f1 = ROOT.TFile("%s/%s.root" % (HVdir, hvPoint), "recreate")
         tFull.Write()
@@ -135,7 +146,6 @@ def run(runid):
         f2.Close()
 
         files = None # clear memory
-        
 
 
 
