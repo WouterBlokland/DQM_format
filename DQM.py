@@ -8,23 +8,26 @@ import glob
 import sys,os
 from subprocess import call
 
-# define fixed time vector of 1024 ns
-time = ROOT.TVectorD(1024)
-for i in range(0, 1024): time[i] = i
+# define fixed time vector of conf.recordLength ns
+time = ROOT.TVectorD(conf.recordLength)
+for i in range(0, conf.recordLength):
+    time[i] = i
 
+# Import default config file
+# Not needed here just for dumb editor not to complain about config not existing
+import config_dqm as conf
 
 def loadFiles(dir):
-
     nEvents = 0
     files = []
+    for i in range(0, conf.nChannels):
 
-    for i in range(0, 16):
 
         lines = [line.rstrip('\n') for line in open("%s/wave_%d.txt" % (dir, i))]
         files.append(lines)
         nEvents = len(lines)
+    nEvents = len(lines) / (conf.recordLength + conf.headerSize)
 
-    nEvents = nEvents / (1024 + 8)
     return nEvents, files
     
 
@@ -43,13 +46,13 @@ def getFloat(s):
 
 def run(runid):
 
-    dir = "/home/webdcs/webdcs/HVSCAN/%s/" % runid
+    dir = conf.dataDir % runid
     print "Analyze run %s" % runid
 
+    for hvPoint in os.listdir(dir):
 
-    for x in os.listdir(dir):
 
-        HVdir = dir + x
+        HVdir = dir + hvPoint + '/'
         print "Running in dir %s" % HVdir
 
         tFull = ROOT.TTree("data", "data") # full events
@@ -65,13 +68,13 @@ def run(runid):
         tStrip.Branch("trgTime", trgTime, "trgTime/I")
         
         pulses = []
-        for i in range(0, 16):
+        for i in range(0, conf.nChannels):
             pulse = ROOT.vector('double')()
             pulses.append(pulse)
             
-            tFull.Branch("pulse_ch%d" % i, pulses[i]) # , "pulse[1024]/F"
-            tStrip.Branch("pulse_ch%d" % i, pulses[i]) # , "pulse[1024]/F"
 
+            tFull.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
+            tStrip.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
 
         ### load all waves into memory
         nEvents, files = loadFiles(HVdir)
@@ -95,11 +98,12 @@ def run(runid):
             elif "Start Index Cell" in files[0][i]: continue
             else:
 
-                for j in range(0, 16): pulses[j].push_back(float(files[j][i]) * 1000 / 4096) 
 
+                for j in range(0, conf.nChannels):
+                    pulses[j].push_back(float(files[j][i]) * 1000 / 4096)
 
             # write and clean
-            if (i+1)%(1024+8) == 0:
+            if (i + 1) % (conf.recordLength + conf.headerSize) == 0:
 
                 entriesWritten += 1
                 #if 1283 == entriesWritten: break
@@ -113,21 +117,22 @@ def run(runid):
                     tStrip.Fill()
 
                 #print "WRITE", evNum, trgTime
-                for k in range(0, 16): pulses[k].clear()
+
+
+                for k in range(0, conf.nChannels):
+                    pulses[k].clear()
 
 
 
-
-
-        f1 = ROOT.TFile("%s/%s.root" % (HVdir, x), "recreate")
+        f1 = ROOT.TFile("%s/%s.root" % (HVdir, hvPoint), "recreate")
         tFull.Write()
         time.Write("time")
         f1.Close()
 
-        f1 = ROOT.TFile("%s/%s.dqm.root" % (HVdir, x), "recreate")
+        f2 = ROOT.TFile("%s/%s.dqm.root" % (HVdir, hvPoint), "recreate")
         tStrip.Write()
         time.Write("time")
-        f1.Close()
+        f2.Close()
 
         files = None # clear memory
         
@@ -144,38 +149,35 @@ def run(runid):
 
 
 
+configFile = "config_dqm"  # Default config file if none is given on cli
+# --- Load configuration File
+configFile = sys.argv[1]
+try:
+    exec ("import {0} as conf".format(configFile))
+except (ImportError, SyntaxError):
+    sys.exit("[{0}] - Cannot import config file '{1}'".format(scriptName, configFile))
+# --- /Load configuration File
 
+runList = conf.runList
 
-
-runs = [2375, 2379, 2383, 2385, 2388, 2390, 2392, 2394, 2396, 2398, 2400, 2402, 2404] # first -> OK
-runs = [2406, 2408, 2410, 2412, 2414, 2416, 2418, 2420, 2422, 2424, 2426, 2428, 2430, 2432] # second -> OK
-runs = [2377, 2382, 2384, 2386, 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third -> OK
-runs = [2407, 2409, 2411, 2413, 2415, 2417, 2419, 2421, 2423, 2425, 2427, 2429, 2431, 2433] # fourth -> OK
-
-runs = [2381]
-
-
-
-runs = [ 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third 
-
-
-runs = [2398, 2402, 2399, 2419, 2396, 2395, 2424, 2401, 2397, 2393, 2392, 2390]
-runs = [2409, 2403, 2412, 2420, 2413, 2416, 2423]
-runs = [2410, 2404, 2411, 2421, 2414, 2415, 2422]
-runs = [2564]
-
-
-runid = int(sys.argv[1])
-runid = "%.6d" % runid
-run(runid)
-
-
-sys.exit()
-
-for runid in runs:
-
-    runid = "%.6d" % runid
+for runid in runList:
+    print 'runid: ', runid
     run(runid)
 
-                        
 
+# runs = [2375, 2379, 2383, 2385, 2388, 2390, 2392, 2394, 2396, 2398, 2400, 2402, 2404]  # first -> OK
+# runs = [2406, 2408, 2410, 2412, 2414, 2416, 2418, 2420, 2422, 2424, 2426, 2428, 2430, 2432]  # second -> OK
+# runs = [2377, 2382, 2384, 2386, 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third -> OK
+# runs = [2407, 2409, 2411, 2413, 2415, 2417, 2419, 2421, 2423, 2425, 2427, 2429, 2431, 2433] # fourth -> OK
+
+# runs = [2381]
+
+
+
+# runs = [ 2389, 2391, 2393, 2395, 2397, 2399, 2401, 2403, 2405] # third
+
+
+# runs = [2398, 2402, 2399, 2419, 2396, 2395, 2424, 2401, 2397, 2393, 2392, 2390]
+# runs = [2409, 2403, 2412, 2420, 2413, 2416, 2423]
+# runs = [2410, 2404, 2411, 2421, 2414, 2415, 2422]
+# runs = [2564]
