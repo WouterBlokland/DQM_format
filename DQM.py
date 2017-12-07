@@ -8,7 +8,7 @@ import numpy
 import time
 import math
 import glob
-import sys,os
+import sys, os
 from subprocess import call
 
 # define fixed time vector of conf.recordLength ns
@@ -21,11 +21,13 @@ for i in range(0, conf.recordLength):
 import config_dqm as conf
 
 def loadFiles(dir):
+    '''Returns nCompleteEvent (int), fileList (list[lines])
+    '''
     nEvents = 0
     files = []
     for i in range(0, conf.nChannels):
         file = dir + conf.dataFileFormat % i
-        lines = [line.rstrip('\n') for line in open(file,'r')]
+        lines = [line.rstrip('\n') for line in open(file, 'r')]
         nEventsInFile = getCompleteEvents(lines)
         if i > 0:
             assert nEventsInFile == nEvents, sys.exit(
@@ -37,6 +39,13 @@ def loadFiles(dir):
 
 
 def getCompleteEvents(lines):
+    ''' Return number of complete events from the files
+        If last event not complete (len(lastEvent)< (recordLength + headerSize)) get rid of it
+    Args
+        lines (list[str]): lines read from a waveform file
+    Returns
+        int: number of completed events
+    '''
     nEvents = len(lines) / (conf.recordLength + conf.headerSize)
     if nEvents.is_integer() is False:
         lines = removePartialEvent(lines)
@@ -46,6 +55,8 @@ def getCompleteEvents(lines):
 
 
 def removePartialEvent(lines):
+    ''' Return truncated file content with only complete event (List)
+    '''
     nLinesPartialEvt = len(lines) % (conf.recordLength + conf.headerSize)
     print '[WARNING]: Last event was not recorded properly, only {} line recorded - Removing event...'.format(
         nLinesPartialEvt)
@@ -56,7 +67,7 @@ def removePartialEvent(lines):
 
 def getInt(s):
     return int(re.search(r'\d+', s).group())
-    
+
 def getFloat(s):
     return float(re.search(r'\d+\.\d+', s).group())
 
@@ -81,19 +92,19 @@ def run(runid):
         tStrip = ROOT.TTree("data", "data") # stripped events
 
         evNum = numpy.zeros(1, dtype=int)
-        trgTime = numpy.zeros(1, dtype=int)  
+        trgTime = numpy.zeros(1, dtype=int)
 
         tFull.Branch("evNum", evNum, "evNum/I")
         tFull.Branch("trgTime", trgTime, "trgTime/I")
 
         tStrip.Branch("evNum", evNum, "evNum/I")
         tStrip.Branch("trgTime", trgTime, "trgTime/I")
-        
+
         pulses = []
         for i in range(0, conf.nChannels):
             pulse = ROOT.vector('double')()
             pulses.append(pulse)
-            
+
 
             tFull.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
             tStrip.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
@@ -126,9 +137,10 @@ def run(runid):
                 #if 1283 == entriesWritten: break
 
                 tFull.Fill()
-                if entriesWritten%ff== 0: 
 
-                    print "Fill stripped ", i, tFull.GetEntries()
+                if entriesWritten % ff == 0:
+                    print "Fill stripped {} {} {:4.2f}%".format(i, tFull.GetEntries(),
+                                                                tFull.GetEntries() / nEvents * 100)
                     tStrip.Fill()
 
                 #print "WRITE", evNum, trgTime
@@ -150,13 +162,8 @@ def run(runid):
 
 
 
-
-
-
-# PROBLEMATIC: 
+# PROBLEMATIC:
 # BINARY: 2381, 2380
-
-
 
 
 configFile = "config_dqm"  # Default config file if none is given on cli
