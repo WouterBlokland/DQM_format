@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+#
+# Ensure that a division will return a float
+from __future__ import division
 import ROOT
 import sys
 import copy
@@ -6,11 +10,22 @@ import math
 from random import randint
 import os
 
+# Import default config file
+# Not needed here just for dumb editor not to complain about config not existing
+import config_dqm as conf
+configFile = "config_dqm"  # Default config file if none is given on cli
+# --- Load configuration File
+configFile = sys.argv[1]
+try:
+    exec ("import {} as conf".format(configFile))
+    print 'success'
+except (ImportError, SyntaxError):
+    sys.exit("[EventDisplay.py] - Cannot import config file '{}'".format(configFile))
+# --- /Load configuration File
+
 ROOT.gROOT.SetBatch()
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptTitle(0)
-
-time = None
 
 
 def vector2list(vec):
@@ -24,14 +39,14 @@ def vector2list(vec):
 def makePlot(x, y, header, fname, count, miny, maxy):
 
     c = ROOT.TCanvas("c", "c", 1200, 900)
-    c.Divide(2, 9, 0.001, 0.002)
+    c.Divide(2, int(math.ceil(conf.nChannels / 2)), 0.001, 0.002)
     graphs = []  # needed to store the TGraphs.. cannot overwrite as ROOT needs them to plot
 
     # loop over all strips
-    for i in range(1, 17):  # was 33
-        if i < 5: continue
-        c.cd(i + 2)
-        p = c.GetPad(i + 2)
+    for i in range(1, conf.nChannels + 1):  # was 33
+        # if i < 5: continue
+        c.cd(i)
+        p = c.GetPad(i)
         p.SetGrid()
 
         g = copy.deepcopy(ROOT.TGraph(len(x), array('d', x), array('d', y[i - 1])))
@@ -91,46 +106,34 @@ def makePlot(x, y, header, fname, count, miny, maxy):
     right.SetTextFont(43)
     right.SetTextSize(20)
     right.SetTextAlign(33)
-    right.DrawLatex(.95, .97, "%s, Event number: %06d" % (header, i))
+    right.DrawLatex(.95, .97, "%s, Event number: %d" % (header, count))
 
     # CMS flag
     #right.SetTextAlign(13)
     #right.DrawLatex(.05, .97,"#bf{CMS} #scale[0.7]{#it{Work in progress}}")
 
     c.Modify()
-    c.Print("/Users/croskas/PhD/RPC/Testbeam/Result_plots/%s_%d.pdf" % (fname, count))
-    #c.Print("/Users/croskas/PhD/RPC/Testbeam/Result_plots/%s_%d.png" % (fname, count))
+    c.Print("%s_%d.pdf" % (fname, count))
 
 
 def parseSingleHV(file, header, fname):
 
     fIn = ROOT.TFile(file, "READ")
-    t = fIn.Get("data")
-    time = fIn.Get("time")
+    tree = fIn.Get('data')
 
-    for i in range(0, t.GetEntries() + 1):
+    # Create the list of branches to read from fIn
+    pulseBranchList = []
+    for bName in ['pulse_ch' + str(iChan) for iChan in range(0, conf.nChannels)]:
+        pulseBranchList.append(ROOT.vector('double')())
+        fIn.data.SetBranchAddress(bName, pulseBranchList[-1])
 
-        time = vector2list(time)
 
-        t.GetEntry(i)
+    for event in tree:
+        time = vector2list(fIn.time)
 
         pulses = {}
-        pulses[0] = vector2list(t.pulse_ch0)
-        pulses[1] = vector2list(t.pulse_ch1)
-        pulses[2] = vector2list(t.pulse_ch2)
-        pulses[3] = vector2list(t.pulse_ch3)
-        pulses[4] = vector2list(t.pulse_ch4)
-        pulses[5] = vector2list(t.pulse_ch5)
-        pulses[6] = vector2list(t.pulse_ch6)
-        pulses[7] = vector2list(t.pulse_ch7)
-        pulses[8] = vector2list(t.pulse_ch8)
-        pulses[9] = vector2list(t.pulse_ch9)
-        pulses[10] = vector2list(t.pulse_ch10)
-        pulses[11] = vector2list(t.pulse_ch11)
-        pulses[12] = vector2list(t.pulse_ch12)
-        pulses[13] = vector2list(t.pulse_ch13)
-        pulses[14] = vector2list(t.pulse_ch14)
-        pulses[15] = vector2list(t.pulse_ch15)
+        for iChan in range(0, conf.nChannels):
+            pulses[iChan] = vector2list(pulseBranchList[iChan])
 
         miny = 5000000
         maxy = -5000000
@@ -140,33 +143,37 @@ def parseSingleHV(file, header, fname):
 
             if min(pulses[p]) < miny: miny = min(pulses[p])
             if max(pulses[p]) > maxy: maxy = max(pulses[p])
-
-        makePlot(time, pulses, header, fname, i, .9 * miny, 1.1 * maxy)
+        makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy)
 
     fIn.Close()
 
 
+def main():
+    runList = []
+    if len(sys.argv) > 2:
+        if isinstance(sys.argv[2], list):
+            runList = sys.argv[2]
+        else:
+            for iRun in range(2, len(sys.argv)):
+                runList.append(sys.argv[iRun])
+    else:
+        runList = conf.runList
+
+    for runid in runList:
+        print 'runid: ', runid
+
+        dir = conf.dataDir % runid
+        print "Analyze run %s" % runid
+        assert os.path.exists(dir) is True, sys.exit('[ERROR]: Directory `{}` not found...exiting'.format(dir))
+
+        for hvPoint in os.listdir(dir):  # loop over all HV
+            HVdir = dir + hvPoint + '/'
+            print "Running in dir %s" % HVdir
+
+            header = "Scan ID: %d, %s" % (int(runid), hvPoint)
+            fname = HVdir + "Scan%d_%s" % (int(runid), hvPoint)
+            parseSingleHV(HVdir + str(hvPoint) + '.dqm.root', header, fname)
+
+
 if __name__ == "__main__":
-
-    runid = 000002
-    runid = "%06d" % runid
-
-    #dir = "/home/webdcs/webdcs/HVSCAN/%06d/" % runid
-    dir = "/Users/croskas/PhD/RPC/Testbeam/ROOT_files/"
-    print "Analyze run %s" % runid
-
-    #wwwbase = "/var/www/html/HVSCAN/%06d/" % runid
-    #if not os.path.exists(wwwbase): os.makedirs(wwwbase)
-
-    for x in os.listdir(dir):  # loop over all HV
-
-        header = "Scan ID: %06d, %s" % (int(runid), x)
-        fname = "Scan%06d_%s" % (int(runid), x)
-
-        #www = wwwbase + x
-        #if not os.path.exists(www): os.makedirs(www)
-
-        HVdir = dir + x
-        file = dir + "/" + x  #+ ".dqm.root"
-
-        parseSingleHV(file, header, fname)
+    main()
