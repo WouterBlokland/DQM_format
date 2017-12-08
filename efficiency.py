@@ -12,7 +12,21 @@ import glob
 import sys,os
 from numpy import mean, sqrt, square, std
 import numpy as np
-import os
+
+# Import default config file
+# Not needed here just for dumb editor not to complain about config not existing
+import config_dqm as conf
+configFile = "config_dqm"  # Default config file if none is given on cli
+# --- Load configuration File
+configFile = sys.argv[1]
+try:
+    exec ("import {} as conf".format(configFile))
+    print 'success'
+except (ImportError, SyntaxError):
+    sys.exit("[EventDisplay.py] - Cannot import config file '{}'".format(configFile))
+# --- /Load configuration File
+
+
 import os
 debug    = int(os.environ['DigiCodeDebug'])
 first    = int(os.environ['DigiCodeFirst'])
