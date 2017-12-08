@@ -43,13 +43,13 @@ def makePlot(x, y, header, fname, count, miny, maxy):
     graphs = []  # needed to store the TGraphs.. cannot overwrite as ROOT needs them to plot
 
     # loop over all strips
-    for i in range(1, conf.nChannels + 1):  # was 33
+    for i in range(0, conf.nChannels):  # was 33
         # if i < 5: continue
-        c.cd(i)
-        p = c.GetPad(i)
+        c.cd(i+1)
+        p = c.GetPad(i+1)
         p.SetGrid()
 
-        g = copy.deepcopy(ROOT.TGraph(len(x), array('d', x), array('d', y[i - 1])))
+        g = copy.deepcopy(ROOT.TGraph(len(x), array('d', x), array('d', y[i])))
 
         g.SetMarkerStyle(20)
         g.SetMarkerSize(.4)
@@ -74,7 +74,7 @@ def makePlot(x, y, header, fname, count, miny, maxy):
         #if i == 3 or i == 4 or i == 31 or i == 32 or i == 17 or i == 18: g.GetXaxis().SetLabelSize(10)
         #else: g.GetXaxis().SetLabelSize(0)
         g.GetXaxis().SetLabelSize(10)
-        if i == 1 or i == 2: g.GetXaxis().SetLabelSize(0)
+        if i == 0 or i == 1: g.GetXaxis().SetLabelSize(0)
 
         #g.GetXaxis().SetNdivisions(508)
 
