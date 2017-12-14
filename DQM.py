@@ -1,4 +1,6 @@
-# Ensure that a division will return a float
+#!/usr/bin/env python
+#
+# # Ensure that a division will return a float
 from __future__ import division
 
 import ROOT
@@ -8,7 +10,8 @@ import numpy
 import time
 import math
 import glob
-import sys, os
+import sys
+import os
 from subprocess import call
 
 # Import default config file
@@ -26,14 +29,14 @@ def loadFiles(dir):
     '''
     nEvents = 0
     files = []
-    for i in range(0, conf.nChannels):
-        file = dir + conf.dataFileFormat % i
+    for iChan in range(0, conf.nChannels):
+        file = dir + conf.dataFileFormat % iChan
         lines = [line.rstrip('\n') for line in open(file, 'r')]
         nEventsInFile = getCompleteEvents(lines)
-        if i > 0:
+        if iChan > 0:
             assert nEventsInFile == nEvents, sys.exit(
                 '[ERROR]: Channels {} and {} don\'t have same number of event!: {}, {} respectively.'.format(
-                    i, i - 1, nEvents, nEventsInFile))
+                    iChan, iChan - 1, nEvents, nEventsInFile))
         nEvents = nEventsInFile
         files.append(lines)
     return int(nEvents), files
@@ -79,12 +82,16 @@ def getFloat(s):
 
 def run(runid):
 
-    dir = conf.dataDir % runid
+    dir = conf.dataDir + str(runid) + '/'
     print "Analyze run %s" % runid
     assert os.path.exists(dir) is True, sys.exit('[ERROR]: Directory `{}` not found...exiting'.format(dir))
 
     for hvPoint in os.listdir(dir):
-
+        try:
+            assert hvPoint.isdigit()
+        except AssertionError:
+            print 'Warning - skipping folder "{}"'.format(hvPoint)
+            continue
         HVdir = dir + hvPoint + '/'
         print "Running in dir %s" % HVdir
 
@@ -101,14 +108,14 @@ def run(runid):
         tStrip.Branch("trgTime", trgTime, "trgTime/I")
 
         pulses = []
-        for i in range(0, conf.nChannels):
+        for iChan in range(0, conf.nChannels):
             pulse = ROOT.vector('double')()
             pulses.append(pulse)
 
-            tFull.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
-            tStrip.Branch("pulse_ch%d" % i, pulses[i])  # , "pulse[conf.recordLength]/F"
+            tFull.Branch("pulse_ch%d" % iChan, pulses[iChan])  # , "pulse[conf.recordLength]/F"
+            tStrip.Branch("pulse_ch%d" % iChan, pulses[iChan])  # , "pulse[conf.recordLength]/F"
 
-        ### load all waves into memory
+        # load all waves into memory
         nEvents, files = loadFiles(HVdir)
 
         print "LOOOOP", nEvents
@@ -116,35 +123,34 @@ def run(runid):
         ff = math.ceil(nEvents / (nEvents * 0.05))
         entriesWritten = 0
 
-        for i in range(0, len(files[0])):
-            if "Record Length" in files[0][i]: continue
-            elif "BoardID" in files[0][i]: continue
-            elif "Channel" in files[0][i]: continue
-            elif "Event Number" in files[0][i]: evNum[0] = getInt(files[0][i])
-            elif "Pattern" in files[0][i]: continue
-            elif "Trigger Time Stamp" in files[0][i]: trgTime[0] = getInt(files[0][i])
-            elif "DC offset (DAC)" in files[0][i]: continue
-            elif "Start Index Cell" in files[0][i]: continue
+        for iTime in range(0, len(files[0])):
+            if "Record Length" in files[0][iTime]: continue
+            elif "BoardID" in files[0][iTime]: continue
+            elif "Channel" in files[0][iTime]: continue
+            elif "Event Number" in files[0][iTime]: evNum[0] = getInt(files[0][iTime])
+            elif "Pattern" in files[0][iTime]:
+                continue
+            elif "Trigger Time Stamp" in files[0][iTime]: trgTime[0] = getInt(files[0][iTime])
+            elif "DC offset (DAC)" in files[0][iTime]: continue
+            elif "Start Index Cell" in files[0][iTime]:
+                continue
             else:
-                for j in range(0, conf.nChannels):
-                    pulses[j].push_back(float(files[j][i]) * 1000 / 4096)
+                for iChan in range(0, conf.nChannels):
+                    pulses[iChan].push_back(float(files[iChan][iTime]))
 
             # write and clean
-            if (i + 1) % (conf.recordLength + conf.headerSize) == 0:
-
+            if (iTime + 1) % (conf.recordLength + conf.headerSize) == 0:
                 entriesWritten += 1
-                #if 1283 == entriesWritten: break
-
                 tFull.Fill()
 
                 if entriesWritten % ff == 0:
-                    print "Fill stripped {} {} {:4.2f}%".format(i, tFull.GetEntries(),
+                    print "Fill stripped {} {} {:4.2f}%".format(iTime, tFull.GetEntries(),
                                                                 tFull.GetEntries() / nEvents * 100)
                     tStrip.Fill()
 
                 #print "WRITE", evNum, trgTime
-                for k in range(0, conf.nChannels):
-                    pulses[k].clear()
+                for iChan in range(0, conf.nChannels):
+                    pulses[iChan].clear()
 
         f1 = ROOT.TFile("%s/%s.root" % (HVdir, hvPoint), "recreate")
         tFull.Write()
@@ -166,10 +172,9 @@ configFile = "config_dqm"  # Default config file if none is given on cli
 # --- Load configuration File
 configFile = sys.argv[1]
 try:
-    exec ("import {0} as conf".format(configFile))
+    exec ("import {} as conf".format(configFile))
 except (ImportError, SyntaxError):
-    sys.exit("[{0}] - Cannot import config file '{1}'".format(scriptName, configFile))
-# --- /Load configuration File
+    sys.exit("[DQM.py] - Cannot import config file '{}'".format(configFile))  # --- /Load configuration File
 
 runList = []
 if len(sys.argv) > 2:
@@ -180,6 +185,11 @@ if len(sys.argv) > 2:
             runList.append(sys.argv[iRun])
 else:
     runList = conf.runList
+
+if len(runList) == 0:
+    assert os.path.exists(conf.dataDir) is True, sys.exit('[ERROR]: Directory `{}` not found...exiting'.format(
+        conf.dataDir))
+    runList = os.listdir(conf.dataDir)
 
 for runid in runList:
     print 'runid: ', runid

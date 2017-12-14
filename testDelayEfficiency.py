@@ -44,6 +44,25 @@ except (ImportError, SyntaxError):
 # run = HVPoint
 
 
+def getBaselineAndDeviation(pulses):
+    mean = {}
+    stdv = {}
+    for iPulse in range(0, conf.nChannels):
+        assert conf.recordLength == len(pulses[iPulse]), sys.exit('ERROR: Weird data in channel' + iPulse)
+        mean[iPulse] = np.mean(pulses[iPulse][:100])
+        stdv[iPulse] = np.std(pulses[iPulse][:100]) * 10.0
+    return mean, stdv
+
+
+def removeBaseLine(pulseList, baseLineList):
+    ''' pulses, baseLine
+    '''
+    newPulses = {}
+    for iPulse in range(0, len(pulseList)):
+        newPulses[iPulse] = pulseList[iPulse] - baseLineList[iPulse]
+    return newPulses
+
+
 def getTimeOverThreshold(pulse, pulsePolarity, mean, stdv, beginSignal):
     '''
     '''
@@ -109,10 +128,15 @@ def computeEfficiency(runFile):
         evNum = event.evNum
 
         # Get baseline + deviation of 10sigma
-        for iPulse in range(0, conf.nChannels):
-            assert conf.recordLength == len(pulse[0]), sys.exit('ERROR: Weird data in channel' + iPulse)
-            mean[iPulse] = np.mean(pulse[iPulse][:100])
-            stdv[iPulse] = np.std(pulse[iPulse][:100]) * 10.0
+        mean, stdv = getBaselineAndDeviation(pulse)
+        print 'mean {} stdv {}'.format(mean, stdv)
+        newPulses = removeBaseLine(pulse, mean)
+        print 'newPulse: ', newPulses
+        sys.exit(0)
+        # for iPulse in range(0, conf.nChannels):
+        #     assert conf.recordLength == len(pulse[0]), sys.exit('ERROR: Weird data in channel' + iPulse)
+        #     mean[iPulse] = np.mean(pulse[iPulse][:100])
+        #     stdv[iPulse] = np.std(pulse[iPulse][:100]) * 10.0
 
         multiplicity = 0
         found = [False] * conf.nChannels
@@ -195,7 +219,7 @@ def main():
     for runId in runList:
         runEffDic[runId] = []
         print 'runId: ', runId
-        dir = conf.dataDir % runId
+        dir = conf.dataDir + str(runId) + '/'
         print "Analyze run %s" % runId
         assert os.path.exists(dir) is True, sys.exit('[ERROR]: Directory `{}` not found...exiting'.format(dir))
         for hvPoint in os.listdir(dir):  # loop over all HV
@@ -227,3 +251,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+# def compareChans(chan1,chan2):
