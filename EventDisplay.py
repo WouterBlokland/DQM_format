@@ -35,6 +35,55 @@ def vector2list(vec):
     return ret
 
 
+def getTimeOverThreshold(pulse, pulsePolarity, mean, stdv, beginSignal):
+    '''
+    '''
+    assert beginSignal < conf.recordLength, sys.exit('[ERROR] Found a signal after end of record, signalTime = ',
+                                                     beginSignal)
+    tot = 0
+    iTime = beginSignal
+    print '\t pol {} - pulse {}'.format(pulsePolarity, pulse[iTime] - mean),
+    while (pulse[iTime] - mean) * pulsePolarity > stdv and iTime < conf.recordLength:
+        tot = tot + 1
+        iTime = iTime + 1
+    print '\t tot {}'.format(tot),
+    return tot
+
+
+def getIntegralOverThreshold(pulse, pulsePolarity, mean, beginSignal, endSignal):
+    '''
+    '''
+    assert beginSignal < conf.recordLength, sys.exit('[ERROR] Found a signal after end of record, signalTime = ',
+                                                     beginSignal)
+    total = 0
+    for iTime in range(beginSignal, endSignal):
+        total += (pulse[iTime] - mean) * pulsePolarity
+    print '\t total {}'.format(total)
+    return total
+
+
+def findPeakPeakLimit(pulse, mean, pulsePolarity, peakTime, increment):
+    ''' Return start(if increment = -1), end(if increment =+1) time of given peak
+    '''
+    assert increment == 1 or increment == -1, sys.exit('ERROR, you increment to find peak time limits is not valid : increment = {}, expect 1 or -1')
+    iTime = peakTime
+    while iTime > 0 and iTime < len(pulse) and (pulse[iTime] - mean) * pulsePolarity > mean:
+        iTime += increment
+    return iTime
+
+
+def findPeakTimeLimits(pulse, mean, pulsePolarity, peakTime):
+    ''' Return start,end time of given peak
+    '''
+    start = findPeakPeakLimit(pulse, mean, pulsePolarity, peakTime, -1)
+    end = findPeakPeakLimit(pulse, mean, pulsePolarity, peakTime, 1)
+    assert start < end, sys.exit('ERROR: your peak start after the end...')
+    assert start > 0, sys.exit('ERROR: your peak start in the negatives ...')
+    assert end < len(pulse), sys.exit('ERROR: your peak end after the pulse ended ...')
+    return start, end
+
+
+# TODO: return point to some kind of mean from before/after peak instead of the baseline.
 def removeHalfNoisePeak(pulse, mean, noiseLimit, pulsePolarity, peakTime, increment):
     iTime = peakTime
     while iTime > 0 and iTime < len(pulse) and (pulse[iTime] - mean) * pulsePolarity > noiseLimit:
@@ -52,16 +101,15 @@ def removeNoisePeak(pulse, mean, noiseLimit, pulsePolarity, peakTime):
 def removeNoisePeaks(pulse, mean, noiseLimit):
     ''' pulse is a single wave not the complete list
     '''
-    print min(pulse), mean, min(pulse) - mean, noiseLimit
-    print max(pulse), mean, max(pulse) - mean, noiseLimit
+    # print min(pulse), mean, min(pulse) - mean, noiseLimit
+    # print max(pulse), mean, max(pulse) - mean, noiseLimit
+
     if abs(min(pulse) - mean) > noiseLimit:
-        print 'totototo'
         pulsePol = -1
         peakTime = np.argmin(pulse)
         pulse = removeNoisePeak(pulse, mean, noiseLimit, pulsePol, peakTime)
 
     if abs(max(pulse) - mean) > noiseLimit:
-        print 'rorototototo'
         pulsePol = 1
         peakTime = np.argmax(pulse)
         pulse = removeNoisePeak(pulse, mean, noiseLimit, pulsePol, peakTime)
@@ -104,7 +152,7 @@ def makePrettyGraph(x, y, color):
     return graph
 
 
-def makePlot(x, y, header, fname, count, miny, maxy):
+def makePlot(x, y, header, fname, evtNumber, miny, maxy):
     c = ROOT.TCanvas("c", "c", 1200, 900)
     c.Divide(2, int(math.ceil(conf.nChannels / 2)), 0.001, 0.002)
     graphs = []  # needed to store the TGraphs.. cannot overwrite as ROOT needs them to plot
@@ -124,22 +172,28 @@ def makePlot(x, y, header, fname, count, miny, maxy):
 
     for iPulse in range(0, conf.nChannels):
         assert conf.recordLength == len(y[iPulse]), sys.exit('ERROR: Weird data in channel' + iPulse)
-        assert conf.recordLength == len(newY[iPulse]), sys.exit('ERROR: Weird data in channel' + iPulse)
-        print 'y[{}]: {}'.format(iPulse, y[iPulse])
-        print 'newY[{}]: {}'.format(iPulse, newY[iPulse])
-        while abs(min(newY[iPulse])) > conf.noiseLimit * stdv[iPulse] or max(newY[iPulse]) > conf.noiseLimit * stdv[iPulse]:
+
+        # TODO: replace stupid while loop, with a proper peak finder
+        # + add condition for peak removal (integrated charge > chargeLimit?, timeSpan<timeLimit(5clock))
+        while abs(min(newY[iPulse])) > conf.noiseLimit * stdv[iPulse] or max(
+                newY[iPulse]) > conf.noiseLimit * stdv[iPulse]:
             newY[iPulse] = removeNoisePeaks(newY[iPulse], mean[iPulse], conf.noiseLimit * stdv[iPulse])
-        assert abs(min(newY[iPulse])) < conf.noiseLimit * stdv[iPulse], sys.exit('Fuck min {} {}'.format(
-            min(newY[iPulse]), conf.noiseLimit * stdv[iPulse]))
-        assert max(newY[iPulse]) < conf.noiseLimit * stdv[iPulse], sys.exit('Fuck max {} {}'.format(
-            max(newY[iPulse]), conf.noiseLimit * stdv[iPulse]))
+
+        # TODO: get peak and display trigger time, tot, integrated charge
+        #         if abs(newY[iPulse][iTime] - mean[iChan]) > stdv[iChan]:  # Found Signal
+        #                     if (pulse[iChan][iTime] - mean[iChan]) * (conf.pulsePolarity) > 0:  # Signal has expected polarity
+        # findPeakTimeLimits(pulse, mean, pulsePolarity, peakTime)
+        # timeOverThresh = getTimeOverThreshold(newY[iPulse], conf.pulsePolarity, mean[iPulse], stdv[iPulse], iTime)
+        # charge = getIntegralOverThreshold(newY[iPulse], conf.pulsePolarity, mean[iPulse], iTime, iTime + timeOverThresh)
+        # end TODO:
+
         mean[iPulse] = np.mean(y[iPulse][:100])
         stdv[iPulse] = np.std(y[iPulse][:100]) * 10.0
         mini[iPulse] = min(y[iPulse])
         maxi[iPulse] = max(y[iPulse])
         if mini[iPulse] < (mean[iPulse] - axisCutOff * stdv[iPulse]) or maxi[iPulse] > (
                 mean[iPulse] + axisCutOff * stdv[iPulse]):
-            print 'toto'
+            # print 'toto'
             noise = True
     globMean = np.mean(mean.values())
     globStdv = np.mean(stdv.values())
@@ -152,8 +206,7 @@ def makePlot(x, y, header, fname, count, miny, maxy):
     #     else:
     #         noise[i] = False
 
-    for i in range(0, conf.nChannels):  # was 33
-        # if i < 5: continue
+    for i in range(0, conf.nChannels):
         c.cd(i + 1)
         p = c.GetPad(i + 1)
         p.SetGrid()
@@ -166,11 +219,11 @@ def makePlot(x, y, header, fname, count, miny, maxy):
             #  round to nearest hundred = avoid zooming too much
             g.SetMinimum(math.floor(min(mini.values()) / 100.0) * 100)
             g.SetMaximum(math.ceil(max(maxi.values()) / 100.0) * 100)
-            print g.GetMinimum(), g.GetMaximum()
+            # print g.GetMinimum(), g.GetMaximum()
         else:
             g.SetMinimum(math.floor((globMean - axisCutOff * globStdv) / 100.0) * 100)
             g.SetMaximum(math.ceil((globMean + axisCutOff * globStdv) / 100.0) * 100)
-            print g.GetMinimum(), g.GetMaximum(), axisCutOff, globMean, globStdv
+            # print g.GetMinimum(), g.GetMaximum(), axisCutOff, globMean, globStdv
         # miny = 0.9 * min(y[i])
         # maxy = 1.1 * max(y[i])
         # g.GetYaxis().SetRangeUser(miny, maxy)
@@ -182,7 +235,7 @@ def makePlot(x, y, header, fname, count, miny, maxy):
         # g.GetXaxis().SetLabelOffset(.1)
         # g.GetXaxis().SetLabelFont(43)
 
-        g.Draw("ALX+")
+        g.Draw("AL")
         g1.Draw("L")
         graphs.append(g)
         graphs.append(g1)
@@ -209,7 +262,7 @@ def makePlot(x, y, header, fname, count, miny, maxy):
     right.SetTextFont(43)
     right.SetTextSize(20)
     right.SetTextAlign(33)
-    right.DrawLatex(.95, .97, "%s, Event number: %d" % (header, count))
+    right.DrawLatex(.95, .97, "%s, Event number: %d" % (header, evtNumber))
 
     # CMS flag
     #right.SetTextAlign(13)
@@ -217,7 +270,9 @@ def makePlot(x, y, header, fname, count, miny, maxy):
 
     c.Modify()
     c.Update()
-    c.Print("%s_%d.pdf" % (fname, count))
+    c.Print("%s_%d.pdf" % (fname, evtNumber))
+    if evtNumber == 756:
+        sys.exit(0)
     # raw_input('Nick')
 
 
