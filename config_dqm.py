@@ -13,3 +13,4 @@ sampling = 250  #MS/s, needed to convert recordTimeStamp in us
 # pulsePolarity used to look for neg/pos signal to compute the efficiency.
 pulsePolarity = -1  # -1 = Negative, 1 = Positive
 timeOverThresholdLimit = 10 # in ns = minTot for a signal
+noiseLimit = 50  # in stdv, any peak bigger will be obliterated

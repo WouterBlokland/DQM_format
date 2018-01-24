@@ -336,8 +336,8 @@ def main():
 
             header = "Scan ID: %d, HV: %sV" % (int(runid), hvPoint)
             fname = HVdir + "Scan%d_%s" % (int(runid), hvPoint)
-            parseSingleHV(HVdir + str(hvPoint) + '.dqm.root', header, fname)
-            # parseSingleHV(HVdir + str(hvPoint) + '.root', header, fname)
+            # parseSingleHV(HVdir + str(hvPoint) + '.dqm.root', header, fname)
+            parseSingleHV(HVdir + str(hvPoint) + '.root', header, fname)
 
 
 if __name__ == "__main__":
