@@ -120,6 +120,7 @@ def run(runid):
 
         print "LOOOOP", nEvents
 
+        assert nEvents>0, sys.exit(" ERROR: You should take some events before running ")
         ff = math.ceil(nEvents / (nEvents * 0.05))
         entriesWritten = 0
 
