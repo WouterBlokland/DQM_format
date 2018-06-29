@@ -3,12 +3,18 @@
 # Ensure that a division will return a float
 from __future__ import division
 import ROOT
+from ROOT import TF1
 import sys
 import copy
 from array import array
 import math
 import os
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
+from scipy.stats import norm
+from scipy.optimize import curve_fit
+
 
 # Import default config file
 # Not needed here just for dumb editor not to complain about config not existing
@@ -77,9 +83,10 @@ def findPeakTimeLimits(pulse, mean, pulsePolarity, peakTime):
     '''
     start = findPeakPeakLimit(pulse, mean, pulsePolarity, peakTime, -1)
     end = findPeakPeakLimit(pulse, mean, pulsePolarity, peakTime, 1)
-    assert start < end, sys.exit('ERROR: your peak start after the end...')
-    assert start > 0, sys.exit('ERROR: your peak start in the negatives ...')
-    assert end < len(pulse), sys.exit('ERROR: your peak end after the pulse ended ...')
+    print(start, end, peakTime)
+    assert start < end, sys.exit('ERROR: your peak starts after the end...')
+    assert start > 0, sys.exit('ERROR: your peak starts in the negatives ...')
+    assert end < len(pulse), sys.exit('ERROR: your peak ends after the pulse ended ...')
     return start, end
 
 
@@ -135,6 +142,175 @@ def removeBaseLine(pulseList, baseLineList):
         newPulses[iPulse] = pulseList[iPulse] - baseLineList[iPulse]
     return newPulses
 
+def findPeakValue(start, end, pulse):
+	peakValues = []
+	i  = start
+	while(i< end): 
+		peakvalues.append(pulse[i])
+		i += 1
+	peak = np.min(peakvalues)
+	return peak
+
+
+def meanPeakValue(beginSignal, endSignal, pulse, mean, pulsePolarity, peakTime):
+	peaks = []
+	#extra list of peaks in order to "skip" the second peak which is smaller then the first because of delayloss
+	truepeaks = []	
+	i = beginSignal
+	while(i< endSignal):
+		peaks.append(findPeakValue(findPeakTimeLimits(pulse, mean, pulsePolarity, peakTime), pulse))
+		i += 1 
+	for k in range(0, len(peaks)):
+		if k%2 == 0:
+			truepeaks.append(peaks[k]) 
+	meanPeak = np.mean(truepeaks)
+	print("The mean peak value is: ", meanPeak, "The number of peaks is", len(peaks))
+
+def absMin(array, pulse, numberOfChannels):
+
+	for i in range(0, conf.nChannels):
+		array.append(np.min(pulse[i]))
+	return array
+
+
+def absMinMean(array):
+	Min_Ch0 = []
+	Min_Ch1 = []
+	Min_Ch2 = []
+	Min_Ch3 = []
+	Min_Ch4 = []
+	Min_Ch5 = []
+	Min_Ch6 = []
+	Min_Ch7 = []
+	MinMean = []
+	i =0
+	while i< len(array):
+		#if array[i] < -250:
+		Min_Ch0.append(array[i])
+		Min_Ch1.append(array[i+1])
+		Min_Ch2.append(array[i+2])
+		Min_Ch3.append(array[i+3])
+		Min_Ch4.append(array[i+4])
+		Min_Ch5.append(array[i+5])
+		Min_Ch6.append(array[i+6])
+		Min_Ch7.append(array[i+7])
+		i = i+8
+	MinMean.append(np.mean(Min_Ch0))
+	MinMean.append(np.mean(Min_Ch1))
+	MinMean.append(np.mean(Min_Ch2))
+	MinMean.append(np.mean(Min_Ch3))
+	MinMean.append(np.mean(Min_Ch4))
+	MinMean.append(np.mean(Min_Ch5))
+	MinMean.append(np.mean(Min_Ch6))
+	MinMean.append(np.mean(Min_Ch7))
+	print MinMean
+
+def absMinMeanFit(array):
+	Min_Ch0 = []
+	Min_Ch1 = []
+	Min_Ch2 = []
+	Min_Ch3 = []
+	Min_Ch4 = []
+	Min_Ch5 = []
+	Min_Ch6 = []
+	Min_Ch7 = []
+	i = 0
+	while i< len(array):
+	#	if array[i] < -250:
+		Min_Ch0.append(array[i])
+		Min_Ch1.append(array[i+1])
+		Min_Ch2.append(array[i+2])
+		Min_Ch3.append(array[i+3])
+		Min_Ch4.append(array[i+4])
+		Min_Ch5.append(array[i+5])
+		Min_Ch6.append(array[i+6])
+		Min_Ch7.append(array[i+7])
+		i = i+8
+	(mu_0, sigma_0) = norm.fit(Min_Ch0)
+	(mu_1, sigma_1) = norm.fit(Min_Ch1)
+	(mu_2, sigma_2) = norm.fit(Min_Ch2)
+	(mu_3, sigma_3) = norm.fit(Min_Ch3)
+	(mu_4, sigma_4) = norm.fit(Min_Ch4)
+	(mu_5, sigma_5) = norm.fit(Min_Ch5)
+	(mu_6, sigma_6) = norm.fit(Min_Ch6)
+	(mu_7, sigma_7) = norm.fit(Min_Ch7)
+	plt.figure(1)
+	plt.subplot(441)
+	n_0, bins_0, patches_0 = plt.hist(Min_Ch0, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_0 = mlab.normpdf(bins_0, mu_0, sigma_0)
+	l_0 = plt.plot(bins_0, y_0, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 0')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_0, sigma_0))
+	plt.subplot(442)
+	n_1, bins_1, patches_1 = plt.hist(Min_Ch1, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_1 = mlab.normpdf(bins_1, mu_1, sigma_1)	
+	l_1 = plt.plot(bins_1, y_1, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 1')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_1, sigma_1))
+	plt.subplot(443)
+	n_2, bins_2, patches_2 = plt.hist(Min_Ch2, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_2 = mlab.normpdf(bins_2, mu_2, sigma_2)
+	l_2 = plt.plot(bins_2, y_2, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 2')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_2, sigma_2))
+	plt.subplot(444)
+	n_3, bins_3, patches_3 = plt.hist(Min_Ch3, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_3 = mlab.normpdf(bins_3, mu_3, sigma_3)
+	l_3 = plt.plot(bins_3, y_3, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 3')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_3, sigma_3))
+	plt.subplot(445)
+	n_4, bins_4, patches_4 = plt.hist(Min_Ch4, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_4 = mlab.normpdf(bins_4, mu_4, sigma_4)	
+	l_4 = plt.plot(bins_4, y_4, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 4')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_4, sigma_4))
+	plt.subplot(446)
+	n_5, bins_5, patches_5 = plt.hist(Min_Ch5, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_5 = mlab.normpdf(bins_5, mu_5, sigma_5)
+	l_5 = plt.plot(bins_5, y_5, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 5')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_5, sigma_5))
+	plt.subplot(447)
+	n_6, bins_6, patches_6 = plt.hist(Min_Ch6, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_6 = mlab.normpdf(bins_6, mu_6, sigma_6)
+	l_6 = plt.plot(bins_6, y_6, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 6')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_6, sigma_6))
+	plt.subplot(448)
+	n_7, bins_7, patches_7 = plt.hist(Min_Ch7, 30, normed =1,facecolor = 'green', alpha = 0.75)
+	y_7 = mlab.normpdf(bins_7, mu_7, sigma_7)
+	l_7 = plt.plot(bins_7, y_7, 'r--', linewidth = 2)
+	plt.xlabel('Minimum pulse values channel 7')
+	plt.title(r'$ \mu=%.3f,\ \sigma=%.3f$' %(mu_7, sigma_7))
+	plt.show()
+
+
+#def DelayLossGraph(delayloss, timelist):
+
+#	for i in range(0,conf.nChannels):
+#		fig_HV_Drift = plt.figure()
+
+#		ax1 = fig_HV_Drift.add_subplot(111)
+
+#		ax1.set_title("Loss due to delay")    
+#		ax1.set_xlabel('Runtime (ns)')
+#		ax1.set_ylabel('Loss (V)')
+#
+#		ax1.plot(timelist, delayloss)
+
+#		leg = ax1.legend()
+
+#		plt.show()
+#		plt.Print("Delay" + "%s_%d.pdf" % (fname, evtNumber))
+
+def efficiency(signal, eff):
+	true_signal = False 
+	for i in range(0, conf.nChannels):
+	 		if np.min(signal[i]) < -20 and true_signal == False:
+				eff.append(np.min(signal[i]))
+				true_signal = True
+	return eff
 
 def makePrettyGraph(x, y, color):
     graph = copy.deepcopy(ROOT.TGraph(len(x), array('d', x), array('d', y)))
@@ -150,6 +326,8 @@ def makePrettyGraph(x, y, color):
     graph.GetYaxis().SetLabelSize(10)
     graph.GetYaxis().SetNdivisions(3)
     return graph
+
+
 
 
 def makePlot(x, y, header, fname, evtNumber, miny, maxy):
@@ -170,14 +348,20 @@ def makePlot(x, y, header, fname, evtNumber, miny, maxy):
     newY = copy.deepcopy(y)
     # newY = removeBaseLine(newY, [250] * conf.nChannels)
 
+    peakChannel = []
+
     for iPulse in range(0, conf.nChannels):
         assert conf.recordLength == len(y[iPulse]), sys.exit('ERROR: Weird data in channel' + iPulse)
-
+	
         # TODO: replace stupid while loop, with a proper peak finder
         # + add condition for peak removal (integrated charge > chargeLimit?, timeSpan<timeLimit(5clock))
         while abs(min(newY[iPulse])) > conf.noiseLimit * stdv[iPulse] or max(
                 newY[iPulse]) > conf.noiseLimit * stdv[iPulse]:
             newY[iPulse] = removeNoisePeaks(newY[iPulse], mean[iPulse], conf.noiseLimit * stdv[iPulse])
+	
+	
+#	peakChannel.append(meanPeakValue(x[0], x[-1], y, mean, conf.pulsePolarity,np.argmin(y)))
+#	print(peakChannel[iPulse])
 
         # TODO: get peak and display trigger time, tot, integrated charge
         #         if abs(newY[iPulse][iTime] - mean[iChan]) > stdv[iChan]:  # Found Signal
@@ -217,28 +401,56 @@ def makePlot(x, y, header, fname, evtNumber, miny, maxy):
         noise = False
         if noise is False:
             #  round to nearest hundred = avoid zooming too much
-            g.SetMinimum(math.floor(min(mini.values()) / 100.0) * 100)
-            g.SetMaximum(math.ceil(max(maxi.values()) / 100.0) * 100)
+            g1.SetMinimum(math.floor(min(mini.values()) / 100.0) * 100)
+            g1.SetMaximum(math.ceil(max(maxi.values()) / 100.0) * 100)
             # print g.GetMinimum(), g.GetMaximum()
         else:
-            g.SetMinimum(math.floor((globMean - axisCutOff * globStdv) / 100.0) * 100)
-            g.SetMaximum(math.ceil((globMean + axisCutOff * globStdv) / 100.0) * 100)
+            g1.SetMinimum(math.floor((globMean - axisCutOff * globStdv) / 100.0) * 100)
+            g1.SetMaximum(math.ceil((globMean + axisCutOff * globStdv) / 100.0) * 100)
             # print g.GetMinimum(), g.GetMaximum(), axisCutOff, globMean, globStdv
         # miny = 0.9 * min(y[i])
         # maxy = 1.1 * max(y[i])
         # g.GetYaxis().SetRangeUser(miny, maxy)
 
         # g.GetXaxis().SetNdivisions(508)
-        g.GetXaxis().SetLimits(400, 800)
+        g1.GetXaxis().SetLimits(550, 1000)
+	g.GetYaxis().SetLimits(100, -900)
         # g.GetXaxis().SetLimits(550, 650)
 
         # g.GetXaxis().SetLabelOffset(.1)
         # g.GetXaxis().SetLabelFont(43)
 
-        g.Draw("AL")
-        g1.Draw("L")
+      #  g.Draw("AL")
+        g1.Draw("AL")
+
+#	if i == 0:
+	
+
+#		popt,pcov = curve_fit(Gauss, x, newY)
+
+
+#		plt.plot(x, Gauss(x, *popt), 'r-', label='fit')
+#		func_1 = TF1('func_1', 'gaus', 540, 564)
+#		func_1.SetParameters(-600,550,0.09) 
+#		fit_1 = g1.Fit('func_1', 'SR')
+#		ROOT.SetOwnership(fit_1, False)
+#		func_2 = TF1('func_2', '[0]*TMath::Gaus(x,[1],[2])', 565, np.max(x))
+#		func_2.SetParameters(-580,570,0.1) 
+#		fit_2 = g1.Fit('func_2', 'SR+')
+#		raw_input('jkkux;kuyc')
+#		gauss1 = makePrettyGraph(x, fit_1, ROOT.kGreen)
+#		gauss2 = makePrettyGraph(x, fit_2, ROOT.kBlack)
+
+#		gauss1.Draw()
+#		gauss2.Draw()
+
+#		graphs.append(gauss1)
+#		graphs.append(guass2)
+
+		
         graphs.append(g)
         graphs.append(g1)
+
 
         strip = i
 
@@ -252,6 +464,145 @@ def makePlot(x, y, header, fname, evtNumber, miny, maxy):
         p.Update()
         p.Modify()
         c.Update()
+
+
+    ### General text on canvas
+    c.cd(0)
+
+    # topText RIGHT
+    right = ROOT.TLatex()
+    right.SetNDC()
+    right.SetTextFont(43)
+    right.SetTextSize(20)
+    right.SetTextAlign(33)
+    right.DrawLatex(.95, .97, "%s, Event number: %d" % (header, evtNumber))
+
+    # CMS flag
+    #right.SetTextAlign(13)
+    #right.DrawLatex(.05, .97,"#bf{CMS} #scale[0.7]{#it{Work in progress}}")
+
+    c.Modify()
+    c.Update()
+
+    c.Print("%s_%d.pdf" % (fname, evtNumber))
+    if evtNumber == 756:
+        sys.exit(0)
+    # raw_input('Nick')
+    return newY
+
+def DelayLossPlot(x, y, header, fname, evtNumber, miny, maxy):
+    c1 = ROOT.TCanvas("c", "c", 1200, 900)
+    c1.Divide(2, int(math.ceil(conf.nChannels / 2)), 0.001, 0.002)
+    graphs1 = []  # needed to store the TGraphs.. cannot overwrite as ROOT needs them to plot
+
+    # loop over all strips
+    mean = {}
+    stdv = {}
+    mini = {}
+    maxi = {}
+    noise = False
+    axisCutOff = 10  # stdv
+    mean, stdv = getBaselineAndDeviation(y)
+    y = removeBaseLine(y, mean)
+    mean, stdv = getBaselineAndDeviation(y)
+    newY = copy.deepcopy(y)
+    # newY = removeBaseLine(newY, [250] * conf.nChannels)
+
+    peakChannel = []
+
+    for iPulse in range(0, conf.nChannels):
+        assert conf.recordLength == len(y[iPulse]), sys.exit('ERROR: Weird data in channel' + iPulse)
+	
+        # TODO: replace stupid while loop, with a proper peak finder
+        # + add condition for peak removal (integrated charge > chargeLimit?, timeSpan<timeLimit(5clock))
+        while abs(min(newY[iPulse])) > conf.noiseLimit * stdv[iPulse] or max(
+                newY[iPulse]) > conf.noiseLimit * stdv[iPulse]:
+            newY[iPulse] = removeNoisePeaks(newY[iPulse], mean[iPulse], conf.noiseLimit * stdv[iPulse])
+	
+	
+#	peakChannel.append(meanPeakValue(x[0], x[-1], y, mean, conf.pulsePolarity,np.argmin(y)))
+#	print(peakChannel[iPulse])
+
+        # TODO: get peak and display trigger time, tot, integrated charge
+        #         if abs(newY[iPulse][iTime] - mean[iChan]) > stdv[iChan]:  # Found Signal
+        #                     if (pulse[iChan][iTime] - mean[iChan]) * (conf.pulsePolarity) > 0:  # Signal has expected polarity
+        # findPeakTimeLimits(pulse, mean, pulsePolarity, peakTime)
+        # timeOverThresh = getTimeOverThreshold(newY[iPulse], conf.pulsePolarity, mean[iPulse], stdv[iPulse], iTime)
+        # charge = getIntegralOverThreshold(newY[iPulse], conf.pulsePolarity, mean[iPulse], iTime, iTime + timeOverThresh)
+        # end TODO:
+
+        mean[iPulse] = np.mean(y[iPulse][:100])
+        stdv[iPulse] = np.std(y[iPulse][:100]) * 10.0
+        mini[iPulse] = min(y[iPulse])
+        maxi[iPulse] = max(y[iPulse])
+        if mini[iPulse] < (mean[iPulse] - axisCutOff * stdv[iPulse]) or maxi[iPulse] > (
+                mean[iPulse] + axisCutOff * stdv[iPulse]):
+            # print 'toto'
+            noise = True
+    globMean = np.mean(mean.values())
+    globStdv = np.mean(stdv.values())
+
+    # for iPulse in range(0, conf.nChannels):
+    #     if mini[i] < (globMean - axisCutOff * globStdv) or maxi[i] > (globMean + axisCutOff * globStdv):
+    #         noise[i] = True
+    #         print axisCutOff * globStdv, globMean - axisCutOff * globStdv, globMean + axisCutOff * globStdv
+    #         print 'Warning peak too high on channel {} : min/max = {}/{}'.format(i, mini[i], maxi[i])
+    #     else:
+    #         noise[i] = False
+
+    for i in range(0, conf.nChannels):
+        c1.cd(i + 1)
+        p1 = c.GetPad(i + 1)
+        p1.SetGrid()
+
+        g1 = makePrettyGraph(x, DelayLoss(newY[i]), ROOT.kRed)
+	func = TF1('func', 'ROOT.TMath::Gaus(x,[1],[2])', np.min(x), np.max(x)) 
+	fit = g1.Fit('func', ROOT.kBlack)
+#	g1.Fit("gaus", ROOT.kPink)
+	fit.Draw()
+	g1.Draw ('AP')
+	c1.Update ()
+	
+
+
+        noise = False
+        if noise is False:
+            #  round to nearest hundred = avoid zooming too much
+            g1.SetMinimum(math.floor(min(mini.values()) / 100.0) * 100)
+            g1.SetMaximum(math.ceil(max(maxi.values()) / 100.0) * 100)
+            # print g.GetMinimum(), g.GetMaximum()
+        else:
+            g1.SetMinimum(math.floor((globMean - axisCutOff * globStdv) / 100.0) * 100)
+            g1.SetMaximum(math.ceil((globMean + axisCutOff * globStdv) / 100.0) * 100)
+            # print g.GetMinimum(), g.GetMaximum(), axisCutOff, globMean, globStdv
+        # miny = 0.9 * min(y[i])
+        # maxy = 1.1 * max(y[i])
+        # g.GetYaxis().SetRangeUser(miny, maxy)
+
+        # g.GetXaxis().SetNdivisions(508)
+        g1.GetXaxis().SetLimits(400, 800)
+        # g.GetXaxis().SetLimits(550, 650)
+
+        # g.GetXaxis().SetLabelOffset(.1)
+        # g.GetXaxis().SetLabelFont(43)
+
+        g1.Draw("AL")
+        graphs1.append(g1)
+
+        strip = i
+
+        right = ROOT.TLatex()
+        right.SetNDC()
+        right.SetTextFont(43)
+        right.SetTextSize(20)
+        right.SetTextAlign(13)
+        right.DrawLatex(.92, .6, "%d" % strip)
+
+        p.Update()
+        p.Modify()
+        c.Update()
+	
+
 
     ### General text on canvas
     c.cd(0)
@@ -274,7 +625,8 @@ def makePlot(x, y, header, fname, evtNumber, miny, maxy):
     if evtNumber == 756:
         sys.exit(0)
     # raw_input('Nick')
-
+    return newY
+    
 
 def parseSingleHV(file, header, fname):
 
@@ -286,7 +638,8 @@ def parseSingleHV(file, header, fname):
     for bName in ['pulse_ch' + str(iChan) for iChan in range(0, conf.nChannels)]:
         pulseBranchList.append(ROOT.vector('double')())
         fIn.data.SetBranchAddress(bName, pulseBranchList[-1])
-
+    AbsMin = []
+    Eff = []
     for event in tree:
         time = vector2list(fIn.time)
 
@@ -304,8 +657,19 @@ def parseSingleHV(file, header, fname):
             if max(pulses[p]) > maxy: maxy = max(pulses[p])
         makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy)
 
-    fIn.Close()
+	absMin(AbsMin, makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy), conf.nChannels)
+	efficiency(makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy), Eff)
+	#DelayLoss(makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy))
+#	DelayLossGraph(	DelayLoss(makePlot(time, pulses, header, fname, event.evNum, .9 * miny, 1.1 * maxy)), time)
 
+#        print AbsMin
+#        absMinMean(AbsMin)
+    absMinMeanFit(AbsMin)
+    s = 'Efficiency: ' + repr(len(Eff)/tree.GetEntries())	
+    print (s)
+#    print len(Eff)
+    fIn.Close()
+    
 
 def main():
     runList = []
